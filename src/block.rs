@@ -55,7 +55,6 @@ impl<C: RMQType> RMQBlock<C> {
             g[i] = len as i8 - 1;
         }
         
-        println!("{:?}", g);
         let mut l: [u16; 16] = [0; 16];
         for i in 1..16 {
             let g_i = g[i];
@@ -70,7 +69,6 @@ impl<C: RMQType> RMQBlock<C> {
             let x = l[i] << 15 - i | l[15 - i];
             val[i] = x.reverse_bits() >> 1;
         }
-        println!("{:?}", l);
 
         Self {
             val,
@@ -78,23 +76,27 @@ impl<C: RMQType> RMQBlock<C> {
         }
     }
 
-    #[inline(always)]
     pub fn query(&self, l: usize, r: usize) -> usize {
         const MASK: u16 = (1 << 15) - 1;
         let mask = MASK >> 15 - (r - l);
         let idx = if r >= 8 { 15 - r } else { r };
         let shift = if r >= 8 { 15 - r } else { 0 };
-        unsafe {
-            let bits = (self.val.get_unchecked(idx) >> shift & mask) as u64;
-            let mut ret = 0u64;
-            // _lzcnt_u32(bits as u32) as usize - (32 - r)
-            // _lzcnt_u64(bits as u64) as usize - (64 - r)
-            // std::intrinsics::ctlz(bits) as usize - (16 - r)
-            std::arch::asm!("lzcnt {ret:r}, {bits:r}",
-                             bits = in(reg) bits,
-                             ret = out(reg) ret);
-            ret as usize - (64 - r)
-        }
+        let bits = (self.val[idx] >> shift & mask) as u64;
+        let mut ret = 0u64;
+        std::intrinsics::ctlz(bits) as usize - (64 - r)
+    }
+
+    pub unsafe fn query_unsafe(&self, l: usize, r: usize) -> usize {
+        const MASK: u16 = (1 << 15) - 1;
+        let mask = MASK >> 15 - (r - l);
+        let idx = if r >= 8 { 15 - r } else { r };
+        let shift = if r >= 8 { 15 - r } else { 0 };
+        let bits = (self.val.get_unchecked(idx) >> shift & mask) as u64;
+        let mut ret = 0u64;
+        // std::intrinsics::ctlz(bits) as usize - (64 - r) // This was not replaced by lzcnt.
+        // bits.leading_zeros() as usize - (64 - r) // This is the same as the above.
+        // _lzcnt_u64(bits as u64) as usize - (64 - r) // This was not deployed inline.
+        r - crate::common::get_msb_pos(bits) as usize
     }
 }
 
@@ -116,14 +118,36 @@ impl<T: std::cmp::PartialOrd + std::default::Default + std::marker::Copy> Block<
         }
     }
 
-    #[inline(never)]
+    pub unsafe fn query_unsafe(&self, l: usize, r: usize) -> (T, T) {
+        let min = self.min.query_unsafe(l, r);
+        let max = self.max.query_unsafe(l, r);
+        (*self.val.get_unchecked(min), *self.val.get_unchecked(max))
+    }
+
     pub fn query(&self, l: usize, r: usize) -> (T, T) {
         let min = self.min.query(l, r);
         let max = self.max.query(l, r);
-        unsafe { (*self.val.get_unchecked(min), *self.val.get_unchecked(max)) }
+        (self.val[min], self.val[max])
     }
 
     pub fn get(&self, idx: usize) -> T {
         unsafe { *self.val.get_unchecked(idx) }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rmq_block_test() {
+        let arr = [3, 5, 8, 4, 10, 1, 2, 9];
+        let block = Block::new(&arr);
+        for i in 0..8 {
+            for j in i..8 {
+                assert_eq!(unsafe{block.query_unsafe(i, j)}, (*arr[i..j+1].iter().min().unwrap(), *arr[i..j+1].iter().max().unwrap()));
+            }
+        }
     }
 }
