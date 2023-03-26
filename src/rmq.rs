@@ -105,6 +105,13 @@ macro_rules! impl_rmq {
                 }
             }
         }
+
+        impl<T: std::cmp::Ord + Copy + std::default::Default + Sized $( + $tr<Archived = T>),*> std::ops::Index<usize> for $t {
+            type Output = T;
+            fn index(&self, idx: usize) -> &Self::Output {
+                &self.blocks[idx / 16][idx % 16]
+            }
+        }
     };
 }
 
@@ -124,6 +131,9 @@ mod tests {
         let arr = (&mut rng).sample_iter(rand::distributions::Uniform::new(0, T::MAX)).take(num).collect::<Vec<_>>();
 
         let rmq = RMQ::new(&arr);
+        for i in 0..num {
+            assert_eq!(rmq[i], arr[i]);
+        }
         for i in 0..num {
             println!("{}", i);
             for j in i..num {

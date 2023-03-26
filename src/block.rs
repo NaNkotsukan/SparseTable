@@ -160,7 +160,14 @@ macro_rules! impl_block {
             pub fn get(&self, idx: usize) -> T {
                 unsafe { *self.val.get_unchecked(idx) }
             }
-        }   
+        }
+
+        impl<T: std::cmp::PartialOrd + std::default::Default $( + $tr<Archived = T>)*> std::ops::Index<usize> for $t {
+            type Output = T;
+            fn index(&self, idx: usize) -> &Self::Output {
+                &self.val[idx]
+            }
+        }
     };
 }
 
