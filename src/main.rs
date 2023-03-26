@@ -1,4 +1,3 @@
-#![feature(asm, core, lang_items, no_std)]
 #![feature(core_intrinsics)]
 mod block;
 mod sparsetable;
