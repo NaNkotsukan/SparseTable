@@ -142,12 +142,6 @@ impl<T: std::cmp::PartialOrd + std::default::Default + std::marker::Copy> Block<
     }
 }
 
-// pub trait BlockTrait<T: std::cmp::PartialOrd + std::default::Default + std::marker::Copy> {
-//     unsafe fn query_unsafe(&self, l: usize, r: usize) -> (T, T);
-//     fn query(&self, l: usize, r: usize) -> (T, T);
-//     fn get(&self, idx: usize) -> T;
-// }
-
 macro_rules! impl_block {
     ($t:ty $(, $tr:ident ),* ) => {
         impl<T: std::cmp::PartialOrd + std::default::Default + std::marker::Copy $( + $tr<Archived = T>)*> $t {
