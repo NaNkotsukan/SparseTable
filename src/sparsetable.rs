@@ -57,8 +57,8 @@ impl<T: SparseTableEntryTrait<Ret = T>> SparseTable<T> {
 impl<T: SparseTableEntryTrait<Ret = T>> SparseTable<T> {
     pub fn query(&self, l: usize, r: usize) -> T::Ret {
         let len = r - l + 1;
-        let d = 64 - std::intrinsics::ctlz(len) as usize - 1;
-        let head = self.heads[d] as usize;
+        let d = 64 - std::intrinsics::ctlz(len) - 1;
+        let head = self.heads[d];
         let a = &self.entries[head + l];
         let b = &self.entries[head + r + 1 - (1 << d)];
         a.with_cmp(b)
@@ -67,7 +67,7 @@ impl<T: SparseTableEntryTrait<Ret = T>> SparseTable<T> {
     pub unsafe fn query_unsafe(&self, l: usize, r: usize) -> T::Ret {
         let len = r - l + 1;
         let d = crate::common::get_msb_pos(len as u64) as usize - 1;
-        let head = *self.heads.get_unchecked(d) as usize;
+        let head = *self.heads.get_unchecked(d);
         let a = self.entries.get_unchecked(head + l);
         let b = self.entries.get_unchecked(head + r + 1 - (1 << d));
         a.with_cmp(b)
@@ -77,7 +77,7 @@ impl<T: SparseTableEntryTrait<Ret = T>> SparseTable<T> {
 impl<T: SparseTableEntryTrait + Archive<Archived = impl SparseTableEntryTrait> + Sized> ArchivedSparseTable<T> {
     pub fn query(&self, l: usize, r: usize) -> <<T as Archive>::Archived as SparseTableEntryTrait>::Ret {
         let len = r - l + 1;
-        let d = 64 - std::intrinsics::ctlz(len) as usize - 1;
+        let d = 64 - std::intrinsics::ctlz(len) - 1;
         let head = self.heads[d] as usize;
         let a = &self.entries[head + l];
         let b = &self.entries[head + r + 1 - (1 << d)];
