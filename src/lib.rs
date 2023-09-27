@@ -4,5 +4,5 @@ mod sparsetable;
 mod common;
 mod rmq;
 
-use crate::rmq::{RMQ, ArchivedRMQ};
-use crate::sparsetable::{SparseTable, ArchivedSparseTable};
+pub use crate::rmq::{RMQ, ArchivedRMQ};
+pub use crate::sparsetable::{SparseTable, ArchivedSparseTable};
