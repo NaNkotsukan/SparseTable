@@ -62,7 +62,7 @@ impl<T: std::cmp::Ord + Copy + std::default::Default + Sized> RMQ<T> {
 
 macro_rules! impl_rmq {
     ($t:ty $(, $tr:ident )* ) => {
-        impl <T: std::cmp::Ord + Copy + std::default::Default + Sized $( + $tr<Archived = T>),*> $t{
+        impl <T: std::cmp::Ord + Copy + std::default::Default + Sized $( + rkyv::Archive + $tr<Archived = T>),*> $t{
             pub fn query(&self, l: usize, r: usize) -> (T, T) {
                 let (l_block, l_offset) = (l / 16, l % 16);
                 let (r_block, r_offset) = (r / 16, r % 16);
@@ -106,7 +106,7 @@ macro_rules! impl_rmq {
             }
         }
 
-        impl<T: std::cmp::Ord + Copy + std::default::Default + Sized $( + $tr<Archived = T>),*> std::ops::Index<usize> for $t {
+        impl<T: std::cmp::Ord + Copy + std::default::Default + Sized $( + rkyv::Archive + $tr<Archived = T>),*> std::ops::Index<usize> for $t {
             type Output = T;
             fn index(&self, idx: usize) -> &Self::Output {
                 &self.blocks[idx / 16][idx % 16]
