@@ -4,6 +4,8 @@ use std::{arch::x86_64::*, marker::PhantomData, default};
 use rkyv::{Archive, Deserialize, Serialize};
 use bytecheck::CheckBytes;
 
+use crate::compare::CompareTrait;
+
 #[derive(Archive, Serialize)]
 pub struct Min;
 
@@ -11,17 +13,17 @@ pub struct Min;
 pub struct Max;
 
 pub trait RMQType {
-    fn cmp<T: std::cmp::PartialOrd>(l: &T, r: &T) -> bool;
+    fn cmp<T: CompareTrait>(l: &T, r: &T) -> bool;
 }
 
 impl RMQType for Min {
-    fn cmp<T: std::cmp::PartialOrd>(l: &T, r: &T) -> bool {
-        l < r
+    fn cmp<T: CompareTrait>(l: &T, r: &T) -> bool {
+        CompareTrait::cmp(l, r) != std::cmp::Ordering::Greater
     }
 }
 impl RMQType for Max {
-    fn cmp<T: std::cmp::PartialOrd>(l: &T, r: &T) -> bool {
-        l > r
+    fn cmp<T: CompareTrait>(l: &T, r: &T) -> bool {
+        CompareTrait::cmp(l, r) != std::cmp::Ordering::Less
     }
 }
 
@@ -33,7 +35,7 @@ pub struct RMQBlock<C: RMQType> {
 }
 
 impl<C: RMQType> RMQBlock<C> {
-    pub fn new<T: std::cmp::PartialOrd>(arr:&[T]) -> Self {
+    pub fn new<T: CompareTrait>(arr:&[T]) -> Self {
         assert!(arr.len() <= 16);
         let len = arr.len();
         let mut st = SmallVec::<[i8; 16]>::new();
@@ -73,7 +75,7 @@ impl<C: RMQType> RMQBlock<C> {
         }
         let mut val = [0; 8];
         for i in 0..8 {
-            let x = l[i] << 15 - i | l[15 - i];
+            let x = l[i] << (15 - i) | l[15 - i];
             val[i] = x.reverse_bits() >> 1;
         }
 
@@ -124,19 +126,19 @@ impl_rmq_block!(ArchivedRMQBlock<C>, Archive);
 #[derive(Archive, Serialize)]
 #[archive_attr(derive(CheckBytes))]
 #[repr(align(64))]
-pub struct Block<T: std::cmp::PartialOrd + std::default::Default> {
+pub struct Block<T: CompareTrait + std::default::Default> {
     min: RMQBlock<Min>,
     max: RMQBlock<Max>,
     val: [T; 16],
 }
 
-impl<T: std::cmp::PartialOrd + std::default::Default + std::marker::Copy> Block<T> {
+impl<T: CompareTrait + std::default::Default + std::marker::Copy> Block<T> {
     pub fn new(arr: &[T]) -> Self {
         let mut val = [T::default(); 16];
         val[..arr.len()].copy_from_slice(arr);
         Self {
-            min: RMQBlock::new(&arr),
-            max: RMQBlock::new(&arr),
+            min: RMQBlock::new(arr),
+            max: RMQBlock::new(arr),
             val,
         }
     }
@@ -144,7 +146,7 @@ impl<T: std::cmp::PartialOrd + std::default::Default + std::marker::Copy> Block<
 
 macro_rules! impl_block {
     ($t:ty $(, $tr:ident ),* ) => {
-        impl<T: std::cmp::PartialOrd + std::default::Default + std::marker::Copy $( + $tr<Archived = T>)*> $t {
+        impl<T: CompareTrait + std::default::Default + std::marker::Copy $( + $tr<Archived = T>)*> $t {
             pub unsafe fn query_unsafe(&self, l: usize, r: usize) -> (T, T) {
                 let min = self.min.query_unsafe(l, r);
                 let max = self.max.query_unsafe(l, r);
@@ -162,7 +164,7 @@ macro_rules! impl_block {
             }
         }
 
-        impl<T: std::cmp::PartialOrd + std::default::Default $( + $tr<Archived = T>)*> std::ops::Index<usize> for $t {
+        impl<T: CompareTrait + std::default::Default $( + $tr<Archived = T>)*> std::ops::Index<usize> for $t {
             type Output = T;
             fn index(&self, idx: usize) -> &Self::Output {
                 &self.val[idx]
@@ -177,6 +179,12 @@ impl_block!(ArchivedBlock<T>, Archive);
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    impl CompareTrait for i32 {
+        fn cmp(a: &Self, b: &Self) -> std::cmp::Ordering {
+            a.cmp(b)
+        }
+    }
 
     #[test]
     fn rmq_block_test() {

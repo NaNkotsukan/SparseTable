@@ -1,9 +1,11 @@
 use rkyv::{Archive, Deserialize, Serialize, Archived};
 use bytecheck::CheckBytes;
 
+use crate::compare::CompareTrait;
+
 pub trait SparseTableEntryTrait {
     type Ret : SparseTableEntryTrait;
-    fn with_cmp(&self, b: &Self) -> Self::Ret ;
+    fn with_cmp(&self, b: &Self) -> Self::Ret;
 }
 
 pub trait SparseTableSrcTrait<T: SparseTableEntryTrait> {

@@ -1,23 +1,25 @@
 use crate::sparsetable::{SparseTableEntryTrait, SparseTableSrcTrait, SparseTable, ArchivedSparseTable};
-use crate::block::{Block};
+use crate::block::Block;
+use crate::compare::{CompareTrait, MinMaxTrait};
+
 use rkyv::{Archive, Deserialize, Serialize};
 use bytecheck::CheckBytes;
 
 #[derive(Archive, Serialize)]
 #[archive_attr(derive(CheckBytes))]
-pub struct SparseTableEntry<T: std::cmp::Ord + Copy> {
+pub struct SparseTableEntry<T: MinMaxTrait + Copy> {
     pub min: T,
     pub max: T,
 }
 
 macro_rules! impl_sparse_table_entry {
     ($t:ty $(, $tr:ident ),* ) => {
-        impl<T: std::cmp::Ord + Copy + Sized $( + $tr<Archived = T>)*> SparseTableEntryTrait for $t {
+        impl<T: MinMaxTrait + Copy + Sized $( + $tr<Archived = T>)*> SparseTableEntryTrait for $t {
             type Ret = SparseTableEntry<T>;
             fn with_cmp(&self, b: &Self) -> Self::Ret {
                 Self::Ret {
-                    min: std::cmp::min(self.min, b.min),
-                    max: std::cmp::max(self.max, b.max)
+                    min: MinMaxTrait::min(self.min, b.min),
+                    max: MinMaxTrait::max(self.max, b.max)
                 }
             }
         }
@@ -27,24 +29,24 @@ macro_rules! impl_sparse_table_entry {
 impl_sparse_table_entry!(SparseTableEntry<T>);
 impl_sparse_table_entry!(ArchivedSparseTableEntry<T>, Archive);
 
-impl<T: std::cmp::Ord + std::default::Default + std::marker::Copy + Sized> SparseTableSrcTrait<SparseTableEntry<T>> for Block<T> {
+impl<T: MinMaxTrait + std::default::Default + std::marker::Copy + Sized> SparseTableSrcTrait<SparseTableEntry<T>> for Block<T> {
     fn get_sparse_table_entry(&self) -> SparseTableEntry<T> {
         let (min, max) = unsafe{ self.query_unsafe(0, 15) };
         SparseTableEntry {
-            min: min,
-            max: max
+            min,
+            max
         }
     }
 }
 
 #[derive(Archive, Serialize)]
 #[archive_attr(derive(CheckBytes))]
-pub struct RMQ<T: std::cmp::Ord + Copy + std::default::Default + Sized> {
+pub struct RMQ<T: MinMaxTrait + Copy + std::default::Default + Sized> {
     pub blocks: Box<[Block<T>]>,
     pub table: SparseTable<SparseTableEntry<T>>,
 }
 
-impl<T: std::cmp::Ord + Copy + std::default::Default + Sized> RMQ<T> {
+impl<T: MinMaxTrait + Copy + std::default::Default + Sized> RMQ<T> {
     pub fn new(arr: &[T]) -> Self {
         let len = arr.len();
         let mut blocks = Vec::with_capacity((len + 15) / 16);
@@ -62,7 +64,7 @@ impl<T: std::cmp::Ord + Copy + std::default::Default + Sized> RMQ<T> {
 
 macro_rules! impl_rmq {
     ($t:ty $(, $tr:ident )* ) => {
-        impl <T: std::cmp::Ord + Copy + std::default::Default + Sized $( + rkyv::Archive + $tr<Archived = T>),*> $t{
+        impl <T: MinMaxTrait + Copy + std::default::Default + Sized $( + rkyv::Archive + $tr<Archived = T>),*> $t{
             pub fn query(&self, l: usize, r: usize) -> (T, T) {
                 let (l_block, l_offset) = (l / 16, l % 16);
                 let (r_block, r_offset) = (r / 16, r % 16);
@@ -71,15 +73,15 @@ macro_rules! impl_rmq {
                 } else {
                     let (min1, max1) = self.blocks[l_block].query(l_offset, 15);
                     let (min2, max2) = self.blocks[r_block].query(0, r_offset);
-                    let min = std::cmp::min(min1, min2);
-                    let max = std::cmp::max(max1, max2);
+                    let min = MinMaxTrait::min(min1, min2);
+                    let max = MinMaxTrait::max(max1, max2);
                     let l_block = l_block + 1;
                     if l_block == r_block {
                         (min, max)
                     } else {
                         let min_max = self.table.query(l_block, r_block - 1);
                         let (min3, max3) = (min_max.min, min_max.max);
-                        (std::cmp::min(min, min3), std::cmp::max(max, max3))
+                        (MinMaxTrait::min(min, min3), MinMaxTrait::max(max, max3))
                     }
                 }
             }
@@ -92,21 +94,21 @@ macro_rules! impl_rmq {
                 } else {
                     let (min1, max1) = self.blocks.get_unchecked(l_block).query_unsafe(l_offset, 15);
                     let (min2, max2) = self.blocks.get_unchecked(r_block).query_unsafe(0, r_offset);
-                    let min = std::cmp::min(min1, min2);
-                    let max = std::cmp::max(max1, max2);
+                    let min = MinMaxTrait::min(min1, min2);
+                    let max = MinMaxTrait::max(max1, max2);
                     let l_block = l_block + 1;
                     if l_block == r_block {
                         (min, max)
                     } else {
                         let min_max = self.table.query_unsafe(l_block, r_block - 1);
                         let (min3, max3) = (min_max.min, min_max.max);
-                        (std::cmp::min(min, min3), std::cmp::max(max, max3))
+                        (MinMaxTrait::min(min, min3), MinMaxTrait::max(max, max3))
                     }
                 }
             }
         }
 
-        impl<T: std::cmp::Ord + Copy + std::default::Default + Sized $( + rkyv::Archive + $tr<Archived = T>),*> std::ops::Index<usize> for $t {
+        impl<T: MinMaxTrait + Copy + std::default::Default + Sized $( + rkyv::Archive + $tr<Archived = T>),*> std::ops::Index<usize> for $t {
             type Output = T;
             fn index(&self, idx: usize) -> &Self::Output {
                 &self.blocks[idx / 16][idx % 16]
@@ -122,6 +124,13 @@ impl_rmq!(ArchivedRMQ<T>, Archive);
 mod tests {
     use super::*;
     use rand::Rng;
+
+    impl CompareTrait for u16 {
+        fn cmp(a: &Self, b: &Self) -> std::cmp::Ordering {
+            a.cmp(b)
+        }
+    }
+    impl MinMaxTrait for u16 {}
 
     #[test]
     fn rmq_rmq_unsafe_test() {
