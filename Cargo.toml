@@ -6,10 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bytecheck = "0.7"
-rand = "0.8.*"
+bytecheck = "*"
+rand = "*"
 rkyv = { version = "0.7", default-features = false, features = ["validation", "size_64", "std"] }
-smallvec = "1"
+smallvec = "*"
 
 [profile.release]
 opt-level = 3
