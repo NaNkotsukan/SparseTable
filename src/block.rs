@@ -126,7 +126,7 @@ impl_rmq_block!(ArchivedRMQBlock<C>, Archive);
 #[derive(Archive, Serialize)]
 #[archive_attr(derive(CheckBytes))]
 #[repr(align(64))]
-pub struct Block<T: CompareTrait + std::default::Default> {
+pub struct Block<T: CompareTrait> {
     min: RMQBlock<Min>,
     max: RMQBlock<Max>,
     val: [T; 16],
@@ -146,7 +146,7 @@ impl<T: CompareTrait + std::default::Default + std::marker::Copy> Block<T> {
 
 macro_rules! impl_block {
     ($t:ty $(, $tr:ident ),* ) => {
-        impl<T: CompareTrait + std::default::Default + std::marker::Copy $( + $tr<Archived = T>)*> $t {
+        impl<T: CompareTrait + std::marker::Copy $( + $tr<Archived = T>)*> $t {
             pub unsafe fn query_unsafe(&self, l: usize, r: usize) -> (T, T) {
                 let min = self.min.query_unsafe(l, r);
                 let max = self.max.query_unsafe(l, r);
@@ -164,7 +164,7 @@ macro_rules! impl_block {
             }
         }
 
-        impl<T: CompareTrait + std::default::Default $( + $tr<Archived = T>)*> std::ops::Index<usize> for $t {
+        impl<T: CompareTrait $( + $tr<Archived = T>)*> std::ops::Index<usize> for $t {
             type Output = T;
             fn index(&self, idx: usize) -> &Self::Output {
                 &self.val[idx]

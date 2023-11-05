@@ -29,7 +29,7 @@ macro_rules! impl_sparse_table_entry {
 impl_sparse_table_entry!(SparseTableEntry<T>);
 impl_sparse_table_entry!(ArchivedSparseTableEntry<T>, Archive);
 
-impl<T: MinMaxTrait + std::default::Default + std::marker::Copy + Sized> SparseTableSrcTrait<SparseTableEntry<T>> for Block<T> {
+impl<T: MinMaxTrait + std::marker::Copy + Sized> SparseTableSrcTrait<SparseTableEntry<T>> for Block<T> {
     fn get_sparse_table_entry(&self) -> SparseTableEntry<T> {
         let (min, max) = unsafe{ self.query_unsafe(0, 15) };
         SparseTableEntry {
@@ -41,7 +41,7 @@ impl<T: MinMaxTrait + std::default::Default + std::marker::Copy + Sized> SparseT
 
 #[derive(Archive, Serialize)]
 #[archive_attr(derive(CheckBytes))]
-pub struct RMQ<T: MinMaxTrait + Copy + std::default::Default + Sized> {
+pub struct RMQ<T: MinMaxTrait + Copy + Sized> {
     pub blocks: Box<[Block<T>]>,
     pub table: SparseTable<SparseTableEntry<T>>,
 }
@@ -64,7 +64,7 @@ impl<T: MinMaxTrait + Copy + std::default::Default + Sized> RMQ<T> {
 
 macro_rules! impl_rmq {
     ($t:ty $(, $tr:ident )* ) => {
-        impl <T: MinMaxTrait + Copy + std::default::Default + Sized $( + rkyv::Archive + $tr<Archived = T>),*> $t{
+        impl <T: MinMaxTrait + Copy + Sized $( + $tr<Archived = T>),*> $t{
             pub fn query(&self, l: usize, r: usize) -> (T, T) {
                 let (l_block, l_offset) = (l / 16, l % 16);
                 let (r_block, r_offset) = (r / 16, r % 16);
@@ -108,7 +108,7 @@ macro_rules! impl_rmq {
             }
         }
 
-        impl<T: MinMaxTrait + Copy + std::default::Default + Sized $( + rkyv::Archive + $tr<Archived = T>),*> std::ops::Index<usize> for $t {
+        impl<T: MinMaxTrait + Copy + Sized $( + $tr<Archived = T>),*> std::ops::Index<usize> for $t {
             type Output = T;
             fn index(&self, idx: usize) -> &Self::Output {
                 &self.blocks[idx / 16][idx % 16]
