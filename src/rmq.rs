@@ -47,7 +47,8 @@ pub struct RMQ<T: MinMaxTrait + Copy + Sized> {
 }
 
 impl<T: MinMaxTrait + Copy + std::default::Default + Sized> RMQ<T> {
-    pub fn new(arr: &[T]) -> Self {
+    pub fn new(arr: impl AsRef<[T]>) -> Self {
+        let arr = arr.as_ref();
         let len = arr.len();
         let mut blocks = Vec::with_capacity((len + 15) / 16);
         let mut i = 0;
