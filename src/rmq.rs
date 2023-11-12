@@ -125,12 +125,6 @@ mod tests {
     use super::*;
     use rand::Rng;
 
-    impl CompareTrait for u16 {
-        fn cmp(a: &Self, b: &Self) -> std::cmp::Ordering {
-            a.cmp(b)
-        }
-    }
-    impl MinMaxTrait for u16 {}
 
     #[test]
     fn rmq_rmq_unsafe_test() {

@@ -180,12 +180,6 @@ impl_block!(ArchivedBlock<T>, Archive);
 mod tests {
     use super::*;
 
-    impl CompareTrait for i32 {
-        fn cmp(a: &Self, b: &Self) -> std::cmp::Ordering {
-            a.cmp(b)
-        }
-    }
-
     #[test]
     fn rmq_block_test() {
         let arr = [3, 5, 8, 4, 10, 1, 2, 9];
